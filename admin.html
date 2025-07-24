@@ -663,18 +663,15 @@
   </div>
 
   <script>
-    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡CAMBIA ESTOS DATOS POR LOS TUYOS!
-    const SUPABASE_URL = 'https://udxuboozylejfvmrstbo.supabase.co'
-    const SUPABASE_ANON_KEY = 'alexcachura1'
+    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡REEMPLAZA CON TUS DATOS REALES!
+const SUPABASE_URL = 'https://udxuboozylejfvmrstbo.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkeHVib296eWxlamZ2bXJzdGJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzY2MTMsImV4cCI6MjA2ODk1MjYxM30.MTO4v4gPgFSpWukbSz6lKhutYhwbc2_5VMg7BcvvG98' // ← Debe ser la clave larga
 
-    // Inicializar Supabase
-    const Clave supabase = proceso.env.SUPABASE_CLAVE
-const supabase =crearCliente(supabaseUrl, Clave alexcachura1)
+// Inicializar Supabase
+const { createClient } = supabase
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
     
-    //const { createClient } = supabase
-    //const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-
     // Variables globales
     const usuariosPermitidos = {
       "alex": "alex1",
