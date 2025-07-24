@@ -501,6 +501,77 @@
       to { transform: rotate(360deg); }
     }
 
+    .productos-lista {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .producto-card {
+      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
+      border: 2px solid var(--border-primary);
+      border-radius: 20px;
+      padding: 1.5rem;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .producto-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--border-accent);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .producto-imagen {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .producto-info h3 {
+      color: var(--accent-primary);
+      margin-bottom: 0.5rem;
+      font-size: 1.2rem;
+    }
+
+    .producto-precio {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--success);
+      margin-bottom: 0.5rem;
+    }
+
+    .producto-categoria {
+      background: var(--bg-hover);
+      color: var(--text-secondary);
+      padding: 0.25rem 0.75rem;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      display: inline-block;
+      margin-bottom: 1rem;
+    }
+
+    .btn-eliminar {
+      background: linear-gradient(135deg, var(--error), #dc2626);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+
+    .btn-eliminar:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+
     @media (max-width: 768px) {
       .container {
         padding: 1rem;
@@ -577,6 +648,7 @@
     
     <div class="nav-container">
       <a href="index.html" class="btn btn-secondary">🏪 Ver Tienda</a>
+      <button class="btn btn-primary" onclick="toggleProductos()">📦 Ver Productos</button>
       <button class="btn btn-danger" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
     </div>
 
@@ -660,18 +732,25 @@
       </form>
     </div>
 
+    <!-- Lista de Productos -->
+    <div class="form-container hidden" id="productosContainer">
+      <h2 class="form-title">📦 Lista de Productos</h2>
+      <div class="productos-lista" id="productosLista">
+        <!-- Los productos se cargarán aquí dinámicamente -->
+      </div>
+    </div>
+
   </div>
 
   <script>
-    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡REEMPLAZA CON TUS DATOS REALES!
-const SUPABASE_URL = 'https://udxuboozylejfvmrstbo.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkeHVib296eWxlamZ2bXJzdGJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzY2MTMsImV4cCI6MjA2ODk1MjYxM30.MTO4v4gPgFSpWukbSz6lKhutYhwbc2_5VMg7BcvvG98' // ← Debe ser la clave larga
+    // 🔥 CONFIGURACIÓN DE SUPABASE
+    const SUPABASE_URL = 'https://udxuboozylejfvmrstbo.supabase.co'
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkeHVib296eWxlamZ2bXJzdGJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzY2MTMsImV4cCI6MjA2ODk1MjYxM30.MTO4v4gPgFSpWukbSz6lKhutYhwbc2_5VMg7BcvvG98'
 
-// Inicializar Supabase
-const { createClient } = supabase
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    // Inicializar Supabase
+    const { createClient } = supabase
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    
     // Variables globales
     const usuariosPermitidos = {
       "alex": "alex1",
@@ -694,6 +773,52 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       configurarEventListeners();
     }
 
+    // Verificar acceso - FUNCIÓN PRINCIPAL DE LOGIN
+    function verificarAcceso() {
+      const usuario = document.getElementById('usuario').value.trim();
+      const clave = document.getElementById('clave').value;
+
+      console.log('Intentando login con:', usuario, clave);
+
+      if (!usuario || !clave) {
+        mostrarNotificacion('⚠️ Completa todos los campos', 'warning');
+        return;
+      }
+
+      if (usuariosPermitidos[usuario] && usuariosPermitidos[usuario] === clave) {
+        sessionStorage.setItem('adminLoggedIn', 'true');
+        sessionStorage.setItem('adminUser', usuario);
+        mostrarNotificacion('✅ Acceso concedido. ¡Bienvenido!', 'success');
+        
+        setTimeout(() => {
+          mostrarPanelAdmin();
+          cargarProductosDesdeBD();
+        }, 1500);
+      } else {
+        mostrarNotificacion('❌ Credenciales incorrectas', 'error');
+        document.getElementById('usuario').value = '';
+        document.getElementById('clave').value = '';
+      }
+    }
+
+    // Mostrar notificaciones
+    function mostrarNotificacion(mensaje, tipo) {
+      const existente = document.querySelector('.notification');
+      if (existente) {
+        existente.remove();
+      }
+
+      const notificacion = document.createElement('div');
+      notificacion.className = `notification ${tipo}`;
+      notificacion.textContent = mensaje;
+      
+      document.body.appendChild(notificacion);
+      
+      setTimeout(() => {
+        notificacion.remove();
+      }, 4000);
+    }
+
     // 🔥 CARGAR PRODUCTOS DESDE SUPABASE
     async function cargarProductosDesdeBD() {
       try {
@@ -708,11 +833,12 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
         productos = data || [];
         actualizarEstadisticas();
-        mostrarNotificacion(`✅ ${productos.length} productos cargados desde Supabase`, 'success');
+        mostrarProductos();
+        mostrarNotificacion(`✅ ${productos.length} productos cargados`, 'success');
         
       } catch (error) {
         console.error('Error cargando productos:', error);
-        mostrarNotificacion('❌ Error cargando productos de Supabase', 'error');
+        mostrarNotificacion('❌ Error: ' + error.message, 'error');
       }
     }
 
@@ -755,7 +881,27 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       }
     }
 
-    // Event listeners
+    // Eliminar producto
+    async function eliminarProducto(id) {
+      if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+
+      try {
+        const { error } = await supabaseClient
+          .from('productos')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        mostrarNotificacion('✅ Producto eliminado', 'success');
+        cargarProductosDesdeBD();
+      } catch (error) {
+        console.error('Error eliminando producto:', error);
+        mostrarNotificacion('❌ Error eliminando producto', 'error');
+      }
+    }
+
+    // Configurar event listeners
     function configurarEventListeners() {
       const form = document.getElementById('productForm');
       if (form) {
@@ -767,46 +913,18 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
         fileInput.addEventListener('change', manejarCambioImagen);
       }
 
-      // Escuchar cambios en tiempo real de Supabase
-      supabaseClient
-        .channel('productos')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
-          cargarProductosDesdeBD();
-        })
-        .subscribe();
-    }
-
-    // Verificar acceso
-    function verificarAcceso() {
-      const usuario = document.getElementById('usuario').value.trim();
-      const clave = document.getElementById('clave').value;
-
-      if (!usuario || !clave) {
-        mostrarNotificacion('⚠️ Completa todos los campos', 'warning');
-        return;
-      }
-
-      if (usuariosPermitidos[usuario] && usuariosPermitidos[usuario] === clave) {
-        sessionStorage.setItem('adminLoggedIn', 'true');
-        sessionStorage.setItem('adminUser', usuario);
-        mostrarNotificacion('✅ Acceso concedido. ¡Bienvenido!', 'success');
-        
-        setTimeout(() => {
-          mostrarPanelAdmin();
-          cargarProductosDesdeBD();
-        }, 1500);
-      } else {
-        mostrarNotificacion('❌ Credenciales incorrectas', 'error');
-        document.getElementById('usuario').value = '';
-        document.getElementById('clave').value = '';
-      }
+      // Escuchar Enter en login
+      document.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !document.getElementById('loginContainer').classList.contains('hidden')) {
+          verificarAcceso();
+        }
+      });
     }
 
     // Mostrar panel admin
     function mostrarPanelAdmin() {
       document.getElementById('loginContainer').classList.add('hidden');
       document.getElementById('adminContainer').classList.remove('hidden');
-      configurarEventListeners();
     }
 
     // Mostrar login
@@ -825,6 +943,12 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       }
     }
 
+    // Toggle productos
+    function toggleProductos() {
+      const container = document.getElementById('productosContainer');
+      container.classList.toggle('hidden');
+    }
+
     // Manejar envío del formulario
     async function manejarEnvioFormulario(e) {
       e.preventDefault();
@@ -832,8 +956,7 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       const submitBtn = document.getElementById('submitBtn');
       const originalText = submitBtn.innerHTML;
       
-      // Mostrar loading
-      submitBtn.innerHTML = '<div class="loading"></div>Guardando en Supabase...';
+      submitBtn.innerHTML = '<div class="loading"></div>Guardando...';
       submitBtn.disabled = true;
 
       try {
@@ -856,18 +979,16 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
           descripcion
         };
 
-        // Guardar en Supabase
-        const productoGuardado = await guardarProductoEnBD(producto, imagenInput.files[0]);
+        await guardarProductoEnBD(producto, imagenInput.files[0]);
         
-        mostrarNotificacion('✅ ¡Producto guardado en Supabase!', 'success');
+        mostrarNotificacion('✅ Producto guardado!', 'success');
         limpiarFormulario();
         cargarProductosDesdeBD();
         
       } catch (error) {
         console.error('Error:', error);
-        mostrarNotificacion('❌ Error al guardar en Supabase', 'error');
+        mostrarNotificacion('❌ Error: ' + error.message, 'error');
       } finally {
-        // Restaurar botón
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
       }
@@ -877,8 +998,88 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     function validarFormulario(nombre, precio, categoria, imagenInput) {
       if (!nombre) {
         mostrarNotificacion('⚠️ El nombre es obligatorio', 'warning');
-        document.getElementById('nombre').focus();
         return false;
       }
 
-      if (isN
+      if (isNaN(precio) || precio <= 0) {
+        mostrarNotificacion('⚠️ El precio debe ser mayor a 0', 'warning');
+        return false;
+      }
+
+      if (!categoria) {
+        mostrarNotificacion('⚠️ La categoría es obligatoria', 'warning');
+        return false;
+      }
+
+      if (!imagenInput.files[0]) {
+        mostrarNotificacion('⚠️ Selecciona una imagen', 'warning');
+        return false;
+      }
+
+      return true;
+    }
+
+    // Limpiar formulario
+    function limpiarFormulario() {
+      document.getElementById('productForm').reset();
+      document.getElementById('imagePreview').style.display = 'none';
+    }
+
+    // Manejar cambio de imagen
+    function manejarCambioImagen(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById('previewImg').src = e.target.result;
+          document.getElementById('imagePreview').style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Actualizar estadísticas
+    function actualizarEstadisticas() {
+      const total = productos.length;
+      const categorias = [...new Set(productos.map(p => p.categoria))].length;
+      const promedio = total > 0 ? productos.reduce((sum, p) => sum + p.precio, 0) / total : 0;
+      const valorTotal = productos.reduce((sum, p) => sum + p.precio, 0);
+
+      document.getElementById('totalProductos').textContent = total;
+      document.getElementById('totalCategorias').textContent = categorias;
+      document.getElementById('promedioPrecios').textContent = `S/ ${promedio.toFixed(2)}`;
+      document.getElementById('valorInventario').textContent = `S/ ${valorTotal.toFixed(2)}`;
+    }
+
+    // Mostrar productos
+    function mostrarProductos() {
+      const container = document.getElementById('productosLista');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      productos.forEach(producto => {
+        const card = document.createElement('div');
+        card.className = 'producto-card';
+        card.innerHTML = `
+          <img src="${producto.imagen}" alt="${producto.nombre}" class="producto-imagen">
+          <div class="producto-info">
+            <h3>${producto.nombre}</h3>
+            <div class="producto-precio">S/ ${producto.precio}</div>
+            <span class="producto-categoria">${producto.categoria}</span>
+            <p>${producto.descripcion || ''}</p>
+            <button class="btn-eliminar" onclick="eliminarProducto(${producto.id})">
+              🗑️ Eliminar
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Inicializar cuando carga la página
+    document.addEventListener('DOMContentLoaded', inicializarApp);
+
+  </script>
+</body>
+</html>
