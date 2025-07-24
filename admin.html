@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Administrador - Importaciones Lanzec</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #131729;
+      --bg-surface: #1a2332;
+      --bg-elevated: #212b3c;
+      --bg-hover: #252f42;
+      --accent-primary: #00d4ff;
+      --accent-secondary: #0ea5e9;
+      --accent-glow: #00f5ff;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #7c8596;
+      --border-primary: #374151;
+      --border-secondary: #4b5563;
+      --border-accent: #00d4ff;
+      --shadow: 0 4px 16px rgba(0,0,0,0.7);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.9);
+      --glow: 0 0 30px rgba(0, 212, 255, 0.4);
+      --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--bg-secondary), var(--bg-surface));
+      padding: 2.5rem 2rem;
+      text-align: center;
+      border-bottom: 2px solid var(--border-primary);
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: conic-gradient(from 0deg, transparent, rgba(0, 212, 255, 0.08), transparent);
+      animation: rotate 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .header h1 {
+      font-size: 3rem;
+      font-weight: 900;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-glow), var(--accent-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 0 40px rgba(0, 212, 255, 0.6);
+    }
+
+    .header p {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      position: relative;
+      z-index: 2;
+      font-weight: 500;
+    }
+
+    .status-indicator {
+      position: absolute;
+      top: 2rem;
+      right: 2rem;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid var(--success);
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--success);
+      z-index: 10;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      animation: pulse-dot 2s infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.2); }
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .login-form {
+      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
+      border: 2px solid var(--border-accent);
+      border-radius: 25px;
+      padding: 3rem;
+      box-shadow: var(--shadow-lg);
+      max-width: 450px;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-form::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-glow), var(--accent-secondary));
+    }
+
+    .login-icon {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 4rem;
+      color: var(--accent-primary);
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
+      padding: 2rem;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      border: 2px solid var(--border-primary);
+      transition: var(--transition);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--border-accent);
+    }
+
+    .stat-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--accent-primary);
+      display: block;
+      text-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-container {
+      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
+      border: 2px solid var(--border-primary);
+      border-radius: 25px;
+      padding: 2.5rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .form-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-glow), var(--accent-secondary));
+    }
+
+    .form-title {
+      text-align: center;
+      color: var(--accent-primary);
+      margin-bottom: 2.5rem;
+      font-size: 2rem;
+      font-weight: 800;
+      text-shadow: 0 0 30px rgba(0, 212, 255, 0.6);
+      position: relative;
+    }
+
+    .form-title::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+      border-radius: 2px;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 2rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .form-group {
+      position: relative;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 1rem 1.25rem;
+      border-radius: 15px;
+      border: 2px solid var(--border-primary);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: var(--transition);
+      font-family: inherit;
+      font-weight: 500;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--border-accent);
+      box-shadow: var(--glow);
+      background: var(--bg-hover);
+      transform: translateY(-2px);
+    }
+
+    .file-input-container {
+      position: relative;
+      border: 3px dashed var(--border-primary);
+      border-radius: 20px;
+      padding: 3rem 2rem;
+      text-align: center;
+      background: linear-gradient(135deg, var(--bg-elevated), var(--bg-hover));
+      transition: var(--transition);
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .file-input-container:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-4px);
+      box-shadow: var(--glow);
+    }
+
+    #imagen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .file-input-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .file-input-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      color: var(--accent-primary);
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .file-input-text {
+      color: var(--text-secondary);
+      font-weight: 500;
+      line-height: 1.6;
+    }
+
+    .file-input-text strong {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    .image-preview {
+      display: none;
+      margin-top: 1.5rem;
+      text-align: center;
+      animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .preview-img {
+      max-width: 250px;
+      max-height: 250px;
+      border-radius: 15px;
+      box-shadow: var(--shadow-lg);
+      border: 3px solid var(--border-accent);
+    }
+
+    .btn {
+      padding: 1rem 2rem;
+      border: 2px solid;
+      border-radius: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 1rem;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: var(--bg-primary);
+      border-color: var(--border-accent);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success), #16a34a);
+      color: white;
+      border-color: var(--success);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, var(--error), #dc2626);
+      color: white;
+      border-color: var(--error);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, var(--bg-elevated), var(--bg-hover));
+      color: var(--text-primary);
+      border-color: var(--border-primary);
+    }
+
+    .btn:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .btn-full {
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 1.25rem;
+      font-size: 1.1rem;
+    }
+
+    .nav-container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(15px);
+      border: 2px solid var(--border-primary);
+      border-radius: 20px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .nav-container .btn {
+      margin: 0 0.75rem 0.5rem 0;
+    }
+
+    .notification {
+      position: fixed;
+      top: 30px;
+      right: 30px;
+      padding: 1.5rem 2rem;
+      border-radius: 15px;
+      color: white;
+      font-weight: 600;
+      z-index: 10000;
+      box-shadow: var(--shadow-lg);
+      animation: slideInNotification 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 2px solid;
+      max-width: 350px;
+      backdrop-filter: blur(10px);
+    }
+
+    @keyframes slideInNotification {
+      from { transform: translateX(100%) scale(0.9); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+
+    .notification.success { 
+      background: linear-gradient(135deg, var(--success), #16a34a); 
+      border-color: var(--success);
+    }
+    .notification.error { 
+      background: linear-gradient(135deg, var(--error), #dc2626); 
+      border-color: var(--error);
+    }
+    .notification.warning { 
+      background: linear-gradient(135deg, var(--warning), #ea580c); 
+      border-color: var(--warning);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header {
+        padding: 2rem 1rem;
+      }
+
+      .header h1 {
+        font-size: 2.2rem;
+      }
+
+      .status-indicator {
+        position: relative;
+        top: auto;
+        right: auto;
+        margin: 1rem auto;
+        justify-content: center;
+      }
+
+      .form-container {
+        padding: 1.5rem;
+      }
+
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-container {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-container .btn {
+        display: block;
+        margin: 0.5rem 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      <span>Supabase Conectado</span>
+    </div>
+    <h1>🛡️ Panel Administrativo</h1>
+    <p>Sistema con Base de Datos Supabase GRATIS - Importaciones Lanzec</p>
+  </div>
+
+  <!-- Formulario de Login -->
+  <div class="login-container" id="loginContainer">
+    <div class="login-form">
+      <div class="login-icon">🔐</div>
+      <h2 class="form-title">Acceso Seguro</h2>
+      <div class="form-group">
+        <label for="usuario">👤 Usuario:</label>
+        <input type="text" id="usuario" placeholder="Ingresa tu usuario">
+      </div>
+      <div class="form-group">
+        <label for="clave">🔑 Contraseña:</label>
+        <input type="password" id="clave" placeholder="Ingresa tu contraseña">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="verificarAcceso()">
+        🚀 Acceder al Sistema
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel Principal -->
+  <div class="container hidden" id="adminContainer">
+    
+    <div class="nav-container">
+      <a href="index.html" class="btn btn-secondary">🏪 Ver Tienda</a>
+      <button class="btn btn-danger" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="stats-container">
+      <div class="stat-card">
+        <div class="stat-icon">📦</div>
+        <span class="stat-number" id="totalProductos">0</span>
+        <div class="stat-label">Total Productos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📁</div>
+        <span class="stat-number" id="totalCategorias">0</span>
+        <div class="stat-label">Categorías Activas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <span class="stat-number" id="promedioPrecios">S/ 0</span>
+        <div class="stat-label">Precio Promedio</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📈</div>
+        <span class="stat-number" id="valorInventario">S/ 0</span>
+        <div class="stat-label">Valor Inventario</div>
+      </div>
+    </div>
+
+    <!-- Formulario de productos -->
+    <div class="form-container">
+      <h2 class="form-title">🆕 Crear Nuevo Producto</h2>
+      
+      <form class="form-grid" id="productForm">
+        <div class="form-group">
+          <label for="nombre">📝 Nombre del Producto</label>
+          <input type="text" id="nombre" placeholder="Ej: iPhone 15 Pro Max 256GB" maxlength="100" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="precio">💵 Precio (S/)</label>
+            <input type="number" id="precio" step="0.01" min="0" placeholder="0.00" required>
+          </div>
+
+          <div class="form-group">
+            <label for="descuento">🏷️ Descuento (%)</label>
+            <input type="number" id="descuento" value="0" min="0" max="100" placeholder="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="categoria">📂 Categoría</label>
+          <input type="text" id="categoria" placeholder="Ej: Electrónicos, Ropa, Hogar" required>
+        </div>
+
+        <div class="form-group">
+          <label for="descripcion">📄 Descripción del Producto</label>
+          <textarea id="descripcion" rows="4" placeholder="Describe las características del producto..." maxlength="500"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>🖼️ Imagen del Producto</label>
+          <div class="file-input-container" id="fileContainer">
+            <input type="file" id="imagen" accept="image/*" required>
+            <div class="file-input-content">
+              <div class="file-input-icon">📷</div>
+              <div class="file-input-text">
+                <strong>Arrastra tu imagen aquí</strong><br>
+                o haz clic para seleccionar<br>
+                <small>Formatos: JPG, PNG, GIF (máx. 5MB)</small>
+              </div>
+            </div>
+          </div>
+          <div class="image-preview" id="imagePreview">
+            <img id="previewImg" class="preview-img" alt="Vista previa">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-full" id="submitBtn">
+          ✨ Crear Producto
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡CAMBIA ESTOS DATOS POR LOS TUYOS!
+    const SUPABASE_URL = 'https://tu-proyecto.supabase.co'
+    const SUPABASE_ANON_KEY = 'tu-clave-anonima-aqui'
+
+    // Inicializar Supabase
+    const { createClient } = supabase
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // Variables globales
+    const usuariosPermitidos = {
+      "admin": "admin2024",
+      "lanzec": "2024admin", 
+      "supervisor": "super123",
+      "gerente": "geren2024"
+    };
+
+    let productos = [];
+    let sesionActiva = sessionStorage.getItem('adminLoggedIn') === 'true';
+
+    // Inicialización
+    function inicializarApp() {
+      if (sesionActiva) {
+        mostrarPanelAdmin();
+        cargarProductosDesdeBD();
+      } else {
+        mostrarLogin();
+      }
+      configurarEventListeners();
+    }
+
+    // 🔥 CARGAR PRODUCTOS DESDE SUPABASE
+    async function cargarProductosDesdeBD() {
+      try {
+        mostrarNotificacion('📡 Cargando productos desde Supabase...', 'success');
+        
+        const { data, error } = await supabaseClient
+          .from('productos')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        productos = data || [];
+        actualizarEstadisticas();
+        mostrarNotificacion(`✅ ${productos.length} productos cargados desde Supabase`, 'success');
+        
+      } catch (error) {
+        console.error('Error cargando productos:', error);
+        mostrarNotificacion('❌ Error cargando productos de Supabase', 'error');
+      }
+    }
+
+    // 🔥 GUARDAR PRODUCTO EN SUPABASE
+    async function guardarProductoEnBD(producto, imagenFile) {
+      try {
+        // 1. Subir imagen a Supabase Storage
+        const fileName = `${Date.now()}_${imagenFile.name}`;
+        const { data: uploadData, error: uploadError } = await supabaseClient.storage
+          .from('productos')
+          .upload(fileName, imagenFile);
+
+        if (uploadError) throw uploadError;
+
+        // 2. Obtener URL pública de la imagen
+        const { data: urlData } = supabaseClient.storage
+          .from('productos')
+          .getPublicUrl(fileName);
+
+        // 3. Guardar producto en la tabla
+        const { data, error } = await supabaseClient
+          .from('productos')
+          .insert([{
+            nombre: producto.nombre,
+            precio: producto.precio,
+            descuento: producto.descuento,
+            categoria: producto.categoria,
+            descripcion: producto.descripcion,
+            imagen: urlData.publicUrl
+          }])
+          .select();
+
+        if (error) throw error;
+
+        return data[0];
+
+      } catch (error) {
+        console.error('Error guardando producto:', error);
+        throw error;
+      }
+    }
+
+    // Event listeners
+    function configurarEventListeners() {
+      const form = document.getElementById('productForm');
+      if (form) {
+        form.addEventListener('submit', manejarEnvioFormulario);
+      }
+
+      const fileInput = document.getElementById('imagen');
+      if (fileInput) {
+        fileInput.addEventListener('change', manejarCambioImagen);
+      }
+
+      // Escuchar cambios en tiempo real de Supabase
+      supabaseClient
+        .channel('productos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'productos' }, () => {
+          cargarProductosDesdeBD();
+        })
+        .subscribe();
+    }
+
+    // Verificar acceso
+    function verificarAcceso() {
+      const usuario = document.getElementById('usuario').value.trim();
+      const clave = document.getElementById('clave').value;
+
+      if (!usuario || !clave) {
+        mostrarNotificacion('⚠️ Completa todos los campos', 'warning');
+        return;
+      }
+
+      if (usuariosPermitidos[usuario] && usuariosPermitidos[usuario] === clave) {
+        sessionStorage.setItem('adminLoggedIn', 'true');
+        sessionStorage.setItem('adminUser', usuario);
+        mostrarNotificacion('✅ Acceso concedido. ¡Bienvenido!', 'success');
+        
+        setTimeout(() => {
+          mostrarPanelAdmin();
+          cargarProductosDesdeBD();
+        }, 1500);
+      } else {
+        mostrarNotificacion('❌ Credenciales incorrectas', 'error');
+        document.getElementById('usuario').value = '';
+        document.getElementById('clave').value = '';
+      }
+    }
+
+    // Mostrar panel admin
+    function mostrarPanelAdmin() {
+      document.getElementById('loginContainer').classList.add('hidden');
+      document.getElementById('adminContainer').classList.remove('hidden');
+      configurarEventListeners();
+    }
+
+    // Mostrar login
+    function mostrarLogin() {
+      document.getElementById('loginContainer').classList.remove('hidden');
+      document.getElementById('adminContainer').classList.add('hidden');
+    }
+
+    // Cerrar sesión
+    function cerrarSesion() {
+      if (confirm('¿Cerrar sesión?')) {
+        sessionStorage.removeItem('adminLoggedIn');
+        sessionStorage.removeItem('adminUser');
+        mostrarLogin();
+        mostrarNotificacion('👋 Sesión cerrada', 'success');
+      }
+    }
+
+    // Manejar envío del formulario
+    async function manejarEnvioFormulario(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('submitBtn');
+      const originalText = submitBtn.innerHTML;
+      
+      // Mostrar loading
+      submitBtn.innerHTML = '<div class="loading"></div>Guardando en Supabase...';
+      submitBtn.disabled = true;
+
+      try {
+        const nombre = document.getElementById('nombre').value.trim();
+        const precio = parseFloat(document.getElementById('precio').value);
+        const descuento = parseFloat(document.getElementById('descuento').value) || 0;
+        const categoria = document.getElementById('categoria').value.trim();
+        const descripcion = document.getElementById('descripcion').value.trim();
+        const imagenInput = document.getElementById('imagen');
+
+        if (!validarFormulario(nombre, precio, categoria, imagenInput)) {
+          return;
+        }
+
+        const producto = {
+          nombre,
+          precio,
+          descuento,
+          categoria,
+          descripcion
+        };
+
+        // Guardar en Supabase
+        const productoGuardado = await guardarProductoEnBD(producto, imagenInput.files[0]);
+        
+        mostrarNotificacion('✅ ¡Producto guardado en Supabase!', 'success');
+        limpiarFormulario();
+        cargarProductosDesdeBD();
+        
+      } catch (error) {
+        console.error('Error:', error);
+        mostrarNotificacion('❌ Error al guardar en Supabase', 'error');
+      } finally {
+        // Restaurar botón
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+      }
+    }
+
+    // Validar formulario
+    function validarFormulario(nombre, precio, categoria, imagenInput) {
+      if (!nombre) {
+        mostrarNotificacion('⚠️ El nombre es obligatorio', 'warning');
+        document.getElementById('nombre').focus();
+        return false;
+      }
+
+      if (isN
