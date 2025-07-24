@@ -668,8 +668,12 @@
     const SUPABASE_ANON_KEY = 'alexcachura1'
 
     // Inicializar Supabase
-    const { createClient } = supabase
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const Clave supabase = proceso.env.SUPABASE_CLAVE
+const supabase =crearCliente(supabaseUrl, Clave alexcachura1)
+
+    
+    //const { createClient } = supabase
+    //const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
     // Variables globales
     const usuariosPermitidos = {
