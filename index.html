@@ -3,542 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Importaciones Lanzec - Tienda Online Premium</title>
+  <title>Importaciones Lanzec - Tienda Online</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  
-  <!-- Supabase SDK -->
-  <script>
-    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡USA LA MISMA QUE EN EL ADMIN!
-    const SUPABASE_URL = 'https://tu-proyecto.supabase.co'
-    const SUPABASE_ANON_KEY = 'tu-clave-anonima-aqui'
-
-    // Inicializar Supabase
-    const { createClient } = supabase
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-
-    // Variables globales
-    let productos = [];
-    let productosFiltrados = [];
-
-    // Inicializar aplicación
-    function inicializarApp() {
-      cargarProductosDesdeBD();
-      configurarEventListeners();
-      configurarTiempoReal();
-    }
-
-    // 🔥 CARGAR PRODUCTOS DESDE SUPABASE
-    async function cargarProductosDesdeBD() {
-      try {
-        const { data, error } = await supabaseClient
-          .from('productos')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        productos = data || [];
-        productosFiltrados = [...productos];
-        mostrarProductos();
-        actualizarEstadisticas();
-        cargarCategorias();
-        
-        if (productos.length === 0) {
-          mostrarEstadoVacio();
-        }
-        
-      } catch (error) {
-        console.error('Error cargando productos:', error);
-        mostrarNotificacion('❌ Error conectando con Supabase', 'error');
-        mostrarEstadoVacio();
-      }
-    }
-
-    // 🔥 CONFIGURAR ACTUALIZACIONES EN TIEMPO REAL
-    function configurarTiempoReal() {
-      supabaseClient
-        .channel('productos')
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'productos' 
-        }, (payload) => {
-          console.log('Cambio detectado en Supabase:', payload);
-          cargarProductosDesdeBD();
-          mostrarNotificacion('🔄 Productos actualizados en tiempo real', 'success');
-        })
-        .subscribe();
-    }
-
-    // Configurar event listeners
-    function configurarEventListeners() {
-      const searchInput = document.getElementById('searchInput');
-      const categoryFilter = document.getElementById('categoryFilter');
-      const sortFilter = document.getElementById('sortFilter');
-
-      if (searchInput) {
-        searchInput.addEventListener('input', debounce(filtrarProductos, 300));
-      }
-
-      if (categoryFilter) {
-        categoryFilter.addEventListener('change', filtrarProductos);
-      }
-
-      if (sortFilter) {
-        sortFilter.addEventListener('change', filtrarProductos);
-      }
-    }
-
-    // Debounce para búsqueda
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
-
-    // Mostrar productos
-    function mostrarProductos() {
-      const contenedor = document.getElementById('productosContainer');
-      
-      if (productosFiltrados.length === 0 && productos.length > 0) {
-        contenedor.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🔍</div>
-            <h3>No se encontraron productos</h3>
-            <p>Intenta con otros términos de búsqueda o filtros diferentes</p>
-          </div>
-        `;
-        return;
-      }
-
-      if (productos.length === 0) {
-        return; // mostrarEstadoVacio se encargará
-      }
-
-      contenedor.innerHTML = '';
-      productosFiltrados.forEach(producto => {
-        const precioFinal = producto.precio * (1 - producto.descuento / 100);
-        
-        const productHTML = `
-          <div class="producto-card">
-            <img src="${producto.imagen}" alt="${producto.nombre}" class="producto-imagen" 
-                 onerror="this.src='https://via.placeholder.com/300x200?text=Sin+Imagen'">
-            <h3 class="producto-nombre">${producto.nombre}</h3>
-            <div class="producto-categoria">📁 ${producto.categoria}</div>
-            <p class="producto-descripcion">${producto.descripcion || 'Sin descripción disponible'}</p>
-            <div class="producto-precios">
-              ${producto.descuento > 0 ? 
-                `<span class="precio-original">S/ ${producto.precio.toFixed(2)}</span>
-                 <span class="precio-final">S/ ${precioFinal.toFixed(2)}</span>
-                 <span class="descuento-badge">-${producto.descuento}%</span>` 
-                : `<span class="precio-final">S/ ${producto.precio.toFixed(2)}</span>`
-              }
-            </div>
-            <div class="producto-acciones">
-              <button class="btn btn-primary" onclick="comprarProducto('${producto.id}')">
-                🛒 Comprar
-              </button>
-              <button class="btn btn-secondary" onclick="verDetalles('${producto.id}')">
-                👁️ Ver más
-              </button>
-            </div>
-          </div>
-        `;
-        
-        contenedor.innerHTML += productHTML;
-      });
-    }
-
-    // Estado vacío
-    function mostrarEstadoVacio() {
-      const contenedor = document.getElementById('productosContainer');
-      contenedor.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📦</div>
-          <h3>¡Bienvenido a Importaciones Lanzec!</h3>
-          <p>Aún no hay productos en nuestra tienda.<br>
-          Nuestro equipo está trabajando para traerte los mejores productos.</p>
-          <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.7;">
-            💡 Administradores: Accede al <a href="admin.html" style="color: var(--accent-primary);">Panel Admin</a> para agregar productos
-          </p>
-        </div>
-      `;
-    }
-
-    // Actualizar estadísticas
-    function actualizarEstadisticas() {
-      const totalProductos = productos.length;
-      const categorias = new Set(productos.map(p => p.categoria));
-      const totalCategorias = categorias.size;
-      const productosConDescuento = productos.filter(p => p.descuento > 0);
-      const promedioDescuento = productosConDescuento.length > 0 
-        ? Math.round(productosConDescuento.reduce((sum, p) => sum + p.descuento, 0) / productosConDescuento.length)
-        : 0;
-
-      document.getElementById('totalProductos').textContent = totalProductos;
-      document.getElementById('totalCategorias').textContent = totalCategorias;
-      document.getElementById('promedioDescuento').textContent = promedioDescuento + '%';
-      document.getElementById('productosDescuento').textContent = productosConDescuento.length;
-    }
-
-    // Cargar categorías en filtro
-    function cargarCategorias() {
-      const categoryFilter = document.getElementById('categoryFilter');
-      const categorias = [...new Set(productos.map(p => p.categoria))];
-      
-      const defaultOption = categoryFilter.querySelector('option[value=""]');
-      categoryFilter.innerHTML = '';
-      categoryFilter.appendChild(defaultOption);
-      
-      categorias.forEach(categoria => {
-        const option = document.createElement('option');
-        option.value = categoria;
-        option.textContent = `📁 ${categoria}`;
-        categoryFilter.appendChild(option);
-      });
-    }
-
-    // Filtrar productos
-    function filtrarProductos() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-      const categoryFilter = document.getElementById('categoryFilter').value;
-      const sortFilter = document.getElementById('sortFilter').value;
-
-      // Filtrar por búsqueda y categoría
-      productosFiltrados = productos.filter(producto => {
-        const matchSearch = producto.nombre.toLowerCase().includes(searchTerm) ||
-                          producto.descripcion.toLowerCase().includes(searchTerm) ||
-                          producto.categoria.toLowerCase().includes(searchTerm);
-        
-        const matchCategory = !categoryFilter || producto.categoria === categoryFilter;
-        
-        return matchSearch && matchCategory;
-      });
-
-      // Ordenar
-      switch (sortFilter) {
-        case 'precio-asc':
-          productosFiltrados.sort((a, b) => a.precio - b.precio);
-          break;
-        case 'precio-desc':
-          productosFiltrados.sort((a, b) => b.precio - a.precio);
-          break;
-        case 'descuento':
-          productosFiltrados.sort((a, b) => b.descuento - a.descuento);
-          break;
-        default:
-          productosFiltrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
-      }
-
-      mostrarProductos();
-    }
-
-    // Funciones de interacción
-    function comprarProducto(id) {
-      const producto = productos.find(p => p.id == id);
-      if (producto) {
-        mostrarNotificacion(`🛒 ${producto.nombre} agregado al carrito`, 'success');
-        // Aquí puedes agregar lógica del carrito
-      }
-    }
-
-    function verDetalles(id) {
-      const producto = productos.find(p => p.id == id);
-      if (producto) {
-        const precioFinal = producto.precio * (1 - producto.descuento / 100);
-        alert(`
-📦 ${producto.nombre}
-📁 Categoría: ${producto.categoria}
-💰 Precio: S/ ${producto.precio.toFixed(2)}
-${producto.descuento > 0 ? `🏷️ Descuento: ${producto.descuento}%\n💸 Precio final: S/ ${precioFinal.toFixed(2)}` : ''}
-📝 ${producto.descripcion || 'Sin descripción'}
-        `);
-      }
-    }
-
-    // Mostrar notificaciones
-    function mostrarNotificacion(mensaje, tipo = 'success') {
-      const existente = document.querySelector('.notification');
-      if (existente) {
-        existente.remove();
-      }
-
-      const notificacion = document.createElement('div');
-      notificacion.className = `notification ${tipo}`;
-      notificacion.textContent = mensaje;
-      
-      document.body.appendChild(notificacion);
-      
-      setTimeout(() => {
-        if (document.body.contains(notificacion)) {
-          notificacion.style.animation = 'slideIn 0.3s ease reverse';
-          setTimeout(() => {
-            if (document.body.contains(notificacion)) {
-              document.body.removeChild(notificacion);
-            }
-          }, 300);
-        }
-      }, 3000);
-    }
-
-    // Inicializar cuando se carga la página
-    document.addEventListener('DOMContentLoaded', inicializarApp);
-  </script>
-
-</body>
-</html> src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
   <style>
-    :root {
-      --bg-primary: #0a0e1a;
-      --bg-secondary: #131729;
-      --bg-surface: #1a2332;
-      --bg-elevated: #212b3c;
-      --bg-hover: #252f42;
-      --accent-primary: #00d4ff;
-      --accent-secondary: #0ea5e9;
-      --accent-glow: #00f5ff;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --error: #ef4444;
-      --text-primary: #f1f5f9;
-      --text-secondary: #cbd5e1;
-      --text-muted: #7c8596;
-      --border-primary: #374151;
-      --border-secondary: #4b5563;
-      --border-accent: #00d4ff;
-      --shadow: 0 4px 16px rgba(0,0,0,0.7);
-      --shadow-lg: 0 12px 40px rgba(0,0,0,0.9);
-      --glow: 0 0 30px rgba(0, 212, 255, 0.4);
-      --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
     * {
-      box-sizing: border-box;
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
     }
 
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      line-height: 1.6;
+      background: linear-gradient(135deg, #0a0e1a, #131729);
+      color: #f1f5f9;
       min-height: 100vh;
     }
 
     .header {
-      background: linear-gradient(135deg, var(--bg-secondary), var(--bg-surface));
+      background: rgba(26, 35, 50, 0.9);
+      backdrop-filter: blur(15px);
       padding: 2rem;
       text-align: center;
-      border-bottom: 2px solid var(--border-primary);
-      box-shadow: var(--shadow-lg);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .header::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: conic-gradient(from 0deg, transparent, rgba(0, 212, 255, 0.08), transparent);
-      animation: rotate 20s linear infinite;
-      pointer-events: none;
-    }
-
-    @keyframes rotate {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      border-bottom: 2px solid #374151;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
     .header h1 {
-      font-size: 3.5rem;
+      font-size: 2.5rem;
       font-weight: 900;
-      margin-bottom: 1rem;
-      background: linear-gradient(135deg, var(--accent-primary), var(--accent-glow), var(--accent-secondary));
+      background: linear-gradient(135deg, #00d4ff, #0ea5e9);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
-      position: relative;
-      z-index: 2;
-      text-shadow: 0 0 40px rgba(0, 212, 255, 0.6);
+      margin-bottom: 0.5rem;
     }
 
     .header p {
-      font-size: 1.3rem;
-      color: var(--text-secondary);
-      position: relative;
-      z-index: 2;
-      font-weight: 500;
-      margin-bottom: 2rem;
+      color: #cbd5e1;
+      font-size: 1.1rem;
     }
 
-    .admin-link {
-      position: absolute;
-      top: 2rem;
-      right: 2rem;
-      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-      color: var(--bg-primary);
-      padding: 0.75rem 1.5rem;
-      border-radius: 15px;
-      text-decoration: none;
-      font-weight: 700;
-      font-size: 0.9rem;
-      border: 2px solid var(--border-accent);
-      transition: var(--transition);
-      box-shadow: var(--glow);
-      z-index: 10;
-    }
-
-    .admin-link:hover {
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .db-status {
-      position: absolute;
-      top: 2rem;
-      left: 2rem;
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid var(--success);
-      border-radius: 20px;
-      padding: 0.5rem 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.8rem;
-      color: var(--success);
-      z-index: 10;
-    }
-
-    .db-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--success);
-      border-radius: 50%;
-      animation: pulse-dot 2s infinite;
-    }
-
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.2); }
-    }
-
-    .filters-container {
-      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
-      padding: 2rem;
-      margin: 2rem auto;
-      max-width: 1200px;
-      border-radius: 20px;
-      border: 2px solid var(--border-primary);
-      box-shadow: var(--shadow);
-    }
-
-    .filters-grid {
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
-      gap: 1.5rem;
-      align-items: end;
-    }
-
-    .search-box {
-      position: relative;
-    }
-
-    .search-input {
-      width: 100%;
-      padding: 1rem 1rem 1rem 3rem;
-      border-radius: 15px;
-      border: 2px solid var(--border-primary);
-      background: var(--bg-elevated);
-      color: var(--text-primary);
-      font-size: 1rem;
-      transition: var(--transition);
-    }
-
-    .search-input:focus {
-      outline: none;
-      border-color: var(--border-accent);
-      box-shadow: var(--glow);
-    }
-
-    .search-icon {
-      position: absolute;
-      left: 1rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      font-size: 1.2rem;
-    }
-
-    .filter-select {
+    .nav {
+      background: rgba(255, 255, 255, 0.05);
       padding: 1rem;
-      border-radius: 15px;
-      border: 2px solid var(--border-primary);
-      background: var(--bg-elevated);
-      color: var(--text-primary);
-      font-size: 1rem;
-      transition: var(--transition);
-    }
-
-    .filter-select:focus {
-      outline: none;
-      border-color: var(--border-accent);
-      box-shadow: var(--glow);
-    }
-
-    .stats-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1.5rem;
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 2rem;
-    }
-
-    .stat-card {
-      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
-      padding: 1.5rem;
-      border-radius: 15px;
       text-align: center;
-      border: 2px solid var(--border-primary);
-      transition: var(--transition);
+      margin: 2rem auto;
+      max-width: 1200px;
+      border-radius: 15px;
+      border: 1px solid #374151;
     }
 
-    .stat-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--border-accent);
-      box-shadow: var(--shadow);
+    .btn-admin {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.3s ease;
     }
 
-    .stat-number {
-      font-size: 2rem;
-      font-weight: 800;
-      color: var(--accent-primary);
-      display: block;
-    }
-
-    .stat-label {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-top: 0.5rem;
+    .btn-admin:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
     }
 
     .container {
       max-width: 1200px;
       margin: 0 auto;
       padding: 2rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      font-size: 1.2rem;
+      color: #cbd5e1;
+    }
+
+    .loading::after {
+      content: '';
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(0, 212, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #00d4ff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     .productos-grid {
@@ -549,79 +107,61 @@ ${producto.descuento > 0 ? `🏷️ Descuento: ${producto.descuento}%\n💸 Prec
     }
 
     .producto-card {
-      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
+      background: linear-gradient(135deg, #1a2332, #212b3c);
+      border: 2px solid #374151;
       border-radius: 20px;
-      padding: 1.5rem;
-      border: 2px solid var(--border-primary);
-      transition: var(--transition);
-      position: relative;
       overflow: hidden;
-    }
-
-    .producto-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(45deg, rgba(0, 212, 255, 0.05), transparent);
-      opacity: 0;
-      transition: opacity 0.3s;
+      transition: all 0.4s ease;
+      position: relative;
     }
 
     .producto-card:hover {
-      transform: translateY(-8px);
-      box-shadow: var(--shadow-lg);
-      border-color: var(--border-accent);
-    }
-
-    .producto-card:hover::before {
-      opacity: 1;
+      transform: translateY(-10px);
+      border-color: #00d4ff;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
     }
 
     .producto-imagen {
       width: 100%;
-      height: 200px;
+      height: 250px;
       object-fit: cover;
-      border-radius: 15px;
-      margin-bottom: 1rem;
-      border: 2px solid var(--border-primary);
-      transition: var(--transition);
+      transition: transform 0.4s ease;
     }
 
     .producto-card:hover .producto-imagen {
-      border-color: var(--border-accent);
-      box-shadow: var(--glow);
+      transform: scale(1.05);
+    }
+
+    .producto-info {
+      padding: 1.5rem;
     }
 
     .producto-nombre {
       font-size: 1.3rem;
       font-weight: 700;
-      color: var(--text-primary);
+      color: #00d4ff;
       margin-bottom: 0.5rem;
-      position: relative;
-      z-index: 1;
+      line-height: 1.3;
     }
 
     .producto-categoria {
-      color: var(--accent-primary);
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      position: relative;
-      z-index: 1;
+      background: rgba(0, 212, 255, 0.1);
+      color: #00d4ff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      display: inline-block;
+      margin-bottom: 1rem;
     }
 
     .producto-descripcion {
-      color: var(--text-secondary);
-      font-size: 0.95rem;
-      margin-bottom: 1rem;
+      color: #cbd5e1;
+      font-size: 0.9rem;
       line-height: 1.5;
-      position: relative;
-      z-index: 1;
+      margin-bottom: 1rem;
+      height: 3rem;
+      overflow: hidden;
     }
 
     .producto-precios {
@@ -629,178 +169,63 @@ ${producto.descuento > 0 ? `🏷️ Descuento: ${producto.descuento}%\n💸 Prec
       align-items: center;
       gap: 1rem;
       margin-bottom: 1rem;
-      position: relative;
-      z-index: 1;
     }
 
     .precio-original {
-      color: var(--text-muted);
-      text-decoration: line-through;
-      font-size: 1rem;
-    }
-
-    .precio-final {
-      color: var(--success);
       font-size: 1.5rem;
       font-weight: 800;
+      color: #22c55e;
+    }
+
+    .precio-descuento {
+      font-size: 1rem;
+      color: #f59e0b;
+      text-decoration: line-through;
     }
 
     .descuento-badge {
-      background: linear-gradient(135deg, var(--error), #dc2626);
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
       color: white;
-      padding: 0.25rem 0.75rem;
-      border-radius: 20px;
+      padding: 0.25rem 0.5rem;
+      border-radius: 8px;
       font-size: 0.8rem;
-      font-weight: 700;
-      margin-left: auto;
-    }
-
-    .producto-acciones {
-      display: flex;
-      gap: 1rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    .btn {
-      padding: 0.75rem 1.5rem;
-      border: 2px solid;
-      border-radius: 10px;
       font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      font-size: 0.9rem;
-      text-decoration: none;
-      display: inline-block;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .btn::before {
-      content: '';
       position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.6s;
+      top: 1rem;
+      right: 1rem;
     }
 
-    .btn:hover::before {
-      left: 100%;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-      color: var(--bg-primary);
-      border-color: var(--border-accent);
-      flex: 1;
-    }
-
-    .btn-secondary {
-      background: linear-gradient(135deg, var(--bg-elevated), var(--bg-hover));
-      color: var(--text-primary);
-      border-color: var(--border-primary);
-      flex: 1;
-    }
-
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow);
-    }
-
-    .empty-state {
+    .no-productos {
       text-align: center;
       padding: 4rem 2rem;
-      color: var(--text-secondary);
-      background: linear-gradient(135deg, var(--bg-surface), var(--bg-elevated));
-      border: 2px solid var(--border-primary);
-      border-radius: 20px;
-      margin: 2rem 0;
+      color: #cbd5e1;
     }
 
-    .empty-state h3 {
+    .no-productos h2 {
       font-size: 2rem;
       margin-bottom: 1rem;
-      color: var(--text-primary);
+      color: #00d4ff;
     }
 
-    .empty-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-      opacity: 0.5;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 2rem;
-      color: var(--text-secondary);
-    }
-
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid var(--border-primary);
-      border-top: 4px solid var(--accent-primary);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 1rem;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .notification {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, var(--success), #16a34a);
+    .error-message {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
       color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 10px;
+      padding: 1.5rem;
+      border-radius: 15px;
+      text-align: center;
+      margin: 2rem 0;
       font-weight: 600;
-      z-index: 10000;
-      box-shadow: var(--shadow-lg);
-      animation: slideIn 0.5s ease;
-    }
-
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
     }
 
     @media (max-width: 768px) {
-      .header h1 {
-        font-size: 2.5rem;
-      }
-
-      .admin-link, .db-status {
-        position: relative;
-        top: auto;
-        right: auto;
-        left: auto;
-        display: inline-block;
-        margin: 0.5rem;
-      }
-
-      .filters-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-      }
-
-      .stats-container {
-        grid-template-columns: repeat(2, 1fr);
-        padding: 0 1rem;
-      }
-
       .container {
         padding: 1rem;
       }
-
+      
+      .header h1 {
+        font-size: 2rem;
+      }
+      
       .productos-grid {
         grid-template-columns: 1fr;
         gap: 1.5rem;
@@ -809,343 +234,164 @@ ${producto.descuento > 0 ? `🏷️ Descuento: ${producto.descuento}%\n💸 Prec
   </style>
 </head>
 <body>
-
   <div class="header">
-    <div class="db-status">
-      <div class="db-dot"></div>
-      <span>Supabase Conectado</span>
-    </div>
-    <a href="admin.html" class="admin-link">🛡️ Panel Admin</a>
-    <h1>🛍️ Importaciones Lanzec</h1>
-    <p>Tu tienda online con base de datos Supabase GRATIS</p>
+    <h1>🛒 Importaciones Lanzec</h1>
+    <p>Los mejores productos importados al mejor precio</p>
   </div>
 
-  <div class="stats-container">
-    <div class="stat-card">
-      <span class="stat-number" id="totalProductos">0</span>
-      <div class="stat-label">📦 Productos</div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-number" id="totalCategorias">0</span>
-      <div class="stat-label">📁 Categorías</div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-number" id="promedioDescuento">0%</span>
-      <div class="stat-label">🏷️ Descuento Promedio</div>
-    </div>
-    <div class="stat-card">
-      <span class="stat-number" id="productosDescuento">0</span>
-      <div class="stat-label">🔥 En Oferta</div>
-    </div>
-  </div>
-
-  <div class="filters-container">
-    <div class="filters-grid">
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="searchInput" class="search-input" placeholder="Buscar productos...">
-      </div>
-      <select id="categoryFilter" class="filter-select">
-        <option value="">📂 Todas las categorías</option>
-      </select>
-      <select id="sortFilter" class="filter-select">
-        <option value="nombre">📝 Ordenar por nombre</option>
-        <option value="precio-asc">💰 Precio: menor a mayor</option>
-        <option value="precio-desc">💰 Precio: mayor a menor</option>
-        <option value="descuento">🏷️ Mayor descuento</option>
-      </select>
-    </div>
+  <div class="nav">
+    <a href="admin.html" class="btn-admin">🛡️ Panel Administrativo</a>
   </div>
 
   <div class="container">
-    <div id="productosContainer" class="productos-grid">
-      <div class="loading">
-        <div class="loading-spinner"></div>
-        <p>Cargando productos desde Supabase...</p>
-      </div>
+    <div id="loading" class="loading">
+      Cargando productos desde Supabase...
+    </div>
+
+    <div id="error" class="error-message" style="display: none;">
+      ❌ Error cargando productos. Verifica la conexión a Supabase.
+    </div>
+
+    <div id="productos" class="productos-grid">
+      <!-- Los productos se cargarán aquí -->
+    </div>
+
+    <div id="no-productos" class="no-productos" style="display: none;">
+      <h2>🛍️ ¡Próximamente!</h2>
+      <p>Estamos preparando increíbles productos para ti.</p>
+      <p>Regresa pronto para ver nuestro catálogo completo.</p>
     </div>
   </div>
 
+  <!-- IMPORTANTE: Cargar Supabase ANTES de usar -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <script>
-    // 🔥 CONFIGURACIÓN DE SUPABASE - ¡USA LA MISMA QUE EN EL ADMIN!
-    const SUPABASE_URL = 'https://tu-proyecto.supabase.co'
-    const SUPABASE_ANON_KEY = 'tu-clave-anonima-aqui'
+    // Esperar a que Supabase se cargue completamente
+    function inicializarTienda() {
+      // Verificar que Supabase está disponible
+      if (typeof supabase === 'undefined') {
+        console.error('❌ Supabase no se cargó correctamente');
+        mostrarError('No se pudo conectar a la base de datos');
+        return;
+      }
 
-    // Inicializar Supabase
-    const { createClient } = supabase
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      console.log('✅ Supabase cargado correctamente');
+      
+      // Configuración de Supabase
+      const SUPABASE_URL = 'https://udxuboozylejfvmrstbo.supabase.co'
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkeHVib296eWxlamZ2bXJzdGJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzNzY2MTMsImV4cCI6MjA2ODk1MjYxM30.MTO4v4gPgFSpWukbSz6lKhutYhwbc2_5VMg7BcvvG98'
 
-    // Variables globales
-    let productos = [];
-    let productosFiltrados = [];
+      const { createClient } = supabase
+      window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    // Inicializar aplicación
-    function inicializarApp() {
-      cargarProductosDesdeBD();
-      configurarEventListeners();
-      configurarTiempoReal();
+      // Cargar productos
+      cargarProductos();
     }
 
-    // 🔥 CARGAR PRODUCTOS DESDE SUPABASE
-    async function cargarProductosDesdeBD() {
+    let productos = [];
+
+    // Cargar productos al iniciar
+    async function cargarProductos() {
       try {
-        const { data, error } = await supabaseClient
+        console.log('🔄 Cargando productos desde Supabase...');
+        
+        const { data, error } = await window.supabaseClient
           .from('productos')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        console.log('📡 Respuesta Supabase:', { data, error });
+
+        if (error) {
+          console.error('❌ Error:', error);
+          throw error;
+        }
 
         productos = data || [];
-        productosFiltrados = [...productos];
-        mostrarProductos();
-        actualizarEstadisticas();
-        cargarCategorias();
+        console.log('📦 Productos cargados:', productos.length);
         
-        if (productos.length === 0) {
-          mostrarEstadoVacio();
-        }
+        mostrarProductos();
         
       } catch (error) {
-        console.error('Error cargando productos:', error);
-        mostrarNotificacion('❌ Error conectando con Supabase', 'error');
-        mostrarEstadoVacio();
+        console.error('❌ Error cargando productos:', error);
+        mostrarError('Error cargando productos: ' + error.message);
+      } finally {
+        document.getElementById('loading').style.display = 'none';
       }
     }
 
-    // 🔥 CONFIGURAR ACTUALIZACIONES EN TIEMPO REAL
-    function configurarTiempoReal() {
-      supabaseClient
-        .channel('productos')
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'productos' 
-        }, (payload) => {
-          console.log('Cambio detectado en Supabase:', payload);
-          cargarProductosDesdeBD();
-          mostrarNotificacion('🔄 Productos actualizados en tiempo real', 'success');
-        })
-        .subscribe();
-    }
-
-    // Configurar event listeners
-    function configurarEventListeners() {
-      const searchInput = document.getElementById('searchInput');
-      const categoryFilter = document.getElementById('categoryFilter');
-      const sortFilter = document.getElementById('sortFilter');
-
-      if (searchInput) {
-        searchInput.addEventListener('input', debounce(filtrarProductos, 300));
-      }
-
-      if (categoryFilter) {
-        categoryFilter.addEventListener('change', filtrarProductos);
-      }
-
-      if (sortFilter) {
-        sortFilter.addEventListener('change', filtrarProductos);
-      }
-    }
-
-    // Debounce para búsqueda
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
-
-    // Mostrar productos
+    // Mostrar productos en la página
     function mostrarProductos() {
-      const contenedor = document.getElementById('productosContainer');
-      
-      if (productosFiltrados.length === 0 && productos.length > 0) {
-        contenedor.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🔍</div>
-            <h3>No se encontraron productos</h3>
-            <p>Intenta con otros términos de búsqueda o filtros diferentes</p>
-          </div>
-        `;
+      const container = document.getElementById('productos');
+      const noProductos = document.getElementById('no-productos');
+
+      if (productos.length === 0) {
+        container.style.display = 'none';
+        noProductos.style.display = 'block';
         return;
       }
 
-      if (productos.length === 0) {
-        return; // mostrarEstadoVacio se encargará
-      }
+      container.innerHTML = '';
+      container.style.display = 'grid';
+      noProductos.style.display = 'none';
 
-      contenedor.innerHTML = '';
-      productosFiltrados.forEach(producto => {
+      productos.forEach(producto => {
         const precioFinal = producto.precio * (1 - producto.descuento / 100);
-        
-        const productHTML = `
-          <div class="producto-card">
-            <img src="${producto.imagen}" alt="${producto.nombre}" class="producto-imagen" 
-                 onerror="this.src='https://via.placeholder.com/300x200?text=Sin+Imagen'">
+        const tieneDescuento = producto.descuento > 0;
+
+        const card = document.createElement('div');
+        card.className = 'producto-card';
+        card.innerHTML = `
+          ${tieneDescuento ? `<div class="descuento-badge">-${producto.descuento}%</div>` : ''}
+          
+          <img src="${producto.imagen}" 
+               alt="${producto.nombre}" 
+               class="producto-imagen"
+               onerror="this.src='https://via.placeholder.com/300x250?text=Sin+Imagen'">
+          
+          <div class="producto-info">
             <h3 class="producto-nombre">${producto.nombre}</h3>
-            <div class="producto-categoria">📁 ${producto.categoria}</div>
-            <p class="producto-descripcion">${producto.descripcion || 'Sin descripción disponible'}</p>
+            <span class="producto-categoria">${producto.categoria}</span>
+            
+            <p class="producto-descripcion">${producto.descripcion || 'Producto de calidad importado especialmente para ti.'}</p>
+            
             <div class="producto-precios">
-              ${producto.descuento > 0 ? 
-                `<span class="precio-original">S/ ${producto.precio.toFixed(2)}</span>
-                 <span class="precio-final">S/ ${precioFinal.toFixed(2)}</span>
-                 <span class="descuento-badge">-${producto.descuento}%</span>` 
-                : `<span class="precio-final">S/ ${producto.precio.toFixed(2)}</span>`
-              }
-            </div>
-            <div class="producto-acciones">
-              <button class="btn btn-primary" onclick="comprarProducto('${producto.id}')">
-                🛒 Comprar
-              </button>
-              <button class="btn btn-secondary" onclick="verDetalles('${producto.id}')">
-                👁️ Ver más
-              </button>
+              <span class="precio-original">S/ ${precioFinal.toFixed(2)}</span>
+              ${tieneDescuento ? `<span class="precio-descuento">S/ ${producto.precio.toFixed(2)}</span>` : ''}
             </div>
           </div>
         `;
         
-        contenedor.innerHTML += productHTML;
+        container.appendChild(card);
       });
     }
 
-    // Estado vacío
-    function mostrarEstadoVacio() {
-      const contenedor = document.getElementById('productosContainer');
-      contenedor.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📦</div>
-          <h3>¡Bienvenido a Importaciones Lanzec!</h3>
-          <p>Aún no hay productos en nuestra tienda.<br>
-          Nuestro equipo está trabajando para traerte los mejores productos.</p>
-          <p style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.7;">
-            💡 Administradores: Accede al <a href="admin.html" style="color: var(--accent-primary);">Panel Admin</a> para agregar productos
-          </p>
-        </div>
-      `;
+    // Mostrar error
+    function mostrarError(mensaje = 'Error cargando productos') {
+      const errorDiv = document.getElementById('error');
+      errorDiv.textContent = '❌ ' + mensaje;
+      errorDiv.style.display = 'block';
+      document.getElementById('productos').style.display = 'none';
+      document.getElementById('no-productos').style.display = 'none';
+      document.getElementById('loading').style.display = 'none';
     }
 
-    // Actualizar estadísticas
-    function actualizarEstadisticas() {
-      const totalProductos = productos.length;
-      const categorias = new Set(productos.map(p => p.categoria));
-      const totalCategorias = categorias.size;
-      const productosConDescuento = productos.filter(p => p.descuento > 0);
-      const promedioDescuento = productosConDescuento.length > 0 
-        ? Math.round(productosConDescuento.reduce((sum, p) => sum + p.descuento, 0) / productosConDescuento.length)
-        : 0;
+    // Esperar a que todo se cargue y luego inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+      // Pequeña pausa para asegurar que Supabase se cargue
+      setTimeout(inicializarTienda, 500);
+    });
 
-      document.getElementById('totalProductos').textContent = totalProductos;
-      document.getElementById('totalCategorias').textContent = totalCategorias;
-      document.getElementById('promedioDescuento').textContent = promedioDescuento + '%';
-      document.getElementById('productosDescuento').textContent = productosConDescuento.length;
-    }
-
-    // Cargar categorías en filtro
-    function cargarCategorias() {
-      const categoryFilter = document.getElementById('categoryFilter');
-      const categorias = [...new Set(productos.map(p => p.categoria))];
-      
-      const defaultOption = categoryFilter.querySelector('option[value=""]');
-      categoryFilter.innerHTML = '';
-      categoryFilter.appendChild(defaultOption);
-      
-      categorias.forEach(categoria => {
-        const option = document.createElement('option');
-        option.value = categoria;
-        option.textContent = `📁 ${categoria}`;
-        categoryFilter.appendChild(option);
-      });
-    }
-
-    // Filtrar productos
-    function filtrarProductos() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-      const categoryFilter = document.getElementById('categoryFilter').value;
-      const sortFilter = document.getElementById('sortFilter').value;
-
-      // Filtrar por búsqueda y categoría
-      productosFiltrados = productos.filter(producto => {
-        const matchSearch = producto.nombre.toLowerCase().includes(searchTerm) ||
-                          producto.descripcion.toLowerCase().includes(searchTerm) ||
-                          producto.categoria.toLowerCase().includes(searchTerm);
-        
-        const matchCategory = !categoryFilter || producto.categoria === categoryFilter;
-        
-        return matchSearch && matchCategory;
-      });
-
-      // Ordenar
-      switch (sortFilter) {
-        case 'precio-asc':
-          productosFiltrados.sort((a, b) => a.precio - b.precio);
-          break;
-        case 'precio-desc':
-          productosFiltrados.sort((a, b) => b.precio - a.precio);
-          break;
-        case 'descuento':
-          productosFiltrados.sort((a, b) => b.descuento - a.descuento);
-          break;
-        default:
-          productosFiltrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
-      }
-
-      mostrarProductos();
-    }
-
-    // Funciones de interacción
-    function comprarProducto(id) {
-      const producto = productos.find(p => p.id == id);
-      if (producto) {
-        mostrarNotificacion(`🛒 ${producto.nombre} agregado al carrito`, 'success');
-        // Aquí puedes agregar lógica del carrito
-      }
-    }
-
-    function verDetalles(id) {
-      const producto = productos.find(p => p.id == id);
-      if (producto) {
-        const precioFinal = producto.precio * (1 - producto.descuento / 100);
-        alert(`
-📦 ${producto.nombre}
-📁 Categoría: ${producto.categoria}
-💰 Precio: S/ ${producto.precio.toFixed(2)}
-${producto.descuento > 0 ? `🏷️ Descuento: ${producto.descuento}%\n💸 Precio final: S/ ${precioFinal.toFixed(2)}` : ''}
-📝 ${producto.descripcion || 'Sin descripción'}
-        `);
-      }
-    }
-
-    // Mostrar notificaciones
-    function mostrarNotificacion(mensaje, tipo = 'success') {
-      const existente = document.querySelector('.notification');
-      if (existente) {
-        existente.remove();
-      }
-
-      const notificacion = document.createElement('div');
-      notificacion.className = `notification ${tipo}`;
-      notificacion.textContent = mensaje;
-      
-      document.body.appendChild(notificacion);
-      
+    // Backup: Si Supabase tarda en cargar
+    window.addEventListener('load', function() {
       setTimeout(() => {
-        if (document.body.contains(notificacion)) {
-          notificacion.style.animation = 'slideIn 0.3s ease reverse';
-          setTimeout(() => {
-            if (document.body.contains(notificacion)) {
-              document.body.removeChild(notificacion);
-            }
-          }, 300);
+        if (typeof supabase === 'undefined') {
+          mostrarError('No se pudo cargar Supabase. Revisa tu conexión a internet.');
         }
       }, 3000);
-    }
+    });
 
-    // Inicializar cuando se carga la página
-    document.addEventListener('DOMContentLoaded', inicializarApp);
-  </script
+  </script>
+</body>
+</html>
